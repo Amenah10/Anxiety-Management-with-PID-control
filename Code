@@ -1,0 +1,74 @@
+#include <Wire.h>
+#include "MAX30100_PulseOximeter.h"
+
+#include <PID_v1.h>
+ 
+#define PIN_INPUT 0
+#define PIN_OUTPUT 3
+ 
+#define REPORTING_PERIOD_MS     1000
+
+//Define Variables we'll be connecting to
+double Setpoint, Input, Output;
+ 
+//Specify the links and initial tuning parameters
+double Kp=2, Ki=5, Kd=1;
+PID myPID(&Input, &Output, &Setpoint, Kp, Ki, Kd, DIRECT);
+ 
+PulseOximeter pox;
+uint32_t tsLastReport = 0;
+ 
+void onBeatDetected()
+{
+    Serial.println("Beat!");
+}
+ 
+void setup()
+{
+  
+ //initialize the variables we're linked to
+ Input = analogRead(A5);
+ 
+ Setpoint = 100;
+ 
+ //turn the PID on
+ myPID.SetMode(AUTOMATIC);
+
+ 
+    Serial.begin(115200);
+    Serial.print("Initializing pulse oximeter..");
+ 
+    // Initialize the PulseOximeter instance
+    // Failures are generally due to an improper I2C wiring, missing power supply
+    // or wrong target chip
+    if (!pox.begin()) {
+        Serial.println("FAILED");
+        for(;;);
+    } else {
+        Serial.println("SUCCESS");
+    }
+     pox.setIRLedCurrent(MAX30100_LED_CURR_7_6MA);
+ 
+    // Register a callback for the beat detection
+    pox.setOnBeatDetectedCallback(onBeatDetected);
+}
+ 
+void loop()
+{
+
+
+ Input = analogRead(A1);
+ myPID.Compute();
+ analogWrite(3,Output);
+    // Make sure to call update as fast as possible
+    pox.update();
+    if (millis() - tsLastReport > REPORTING_PERIOD_MS) {
+        Serial.print("Heart rate:");
+        Serial.print(pox.getHeartRate());
+        Serial.print("bpm / SpO2:");
+        Serial.print(pox.getSpO2());
+        Serial.println("%");
+ 
+        tsLastReport = millis();
+    }
+}
